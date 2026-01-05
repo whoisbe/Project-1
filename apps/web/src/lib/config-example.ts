@@ -18,8 +18,9 @@
  * // Access Reranker config
  * const rerankerProvider = config.reranker.provider;
  * 
- * // Access Firecrawl config
- * const firecrawlKey = config.firecrawl.apiKey;
+ * // Access Docs config
+ * const docsRepoPath = config.docs.repoPath;
+ * const docsBaseUrl = config.docs.baseUrl;
  * ```
  */
 
@@ -32,7 +33,7 @@ export { config, type Config };
 export const typesenseConfig = config.typesense;
 export const openaiConfig = config.openai;
 export const rerankerConfig = config.reranker;
-export const firecrawlConfig = config.firecrawl;
+export const docsConfig = config.docs;
 
 
 

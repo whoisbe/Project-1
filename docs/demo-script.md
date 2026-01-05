@@ -26,7 +26,7 @@ Optional but recommended:
 
 ## 0:00–0:10 — One-liner + what you’re about to show
 Say:
-> “This is an AI-powered documentation search MVP. It crawls the Typesense docs with Firecrawl, chunks by headings, generates OpenAI embeddings, indexes into Typesense, then does hybrid retrieval with RRF fusion and a hosted reranker.”
+> "This is an AI-powered documentation search MVP. It loads the Typesense docs from a local repository, chunks by headings, generates OpenAI embeddings, indexes into Typesense, then does hybrid retrieval with RRF fusion and a hosted reranker."
 
 ---
 

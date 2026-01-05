@@ -4,6 +4,7 @@
  * Provides:
  * - getTypesenseClient() - Constructs and returns a Typesense client instance
  * - ensureDocsChunksCollection() - Ensures the docs_chunks collection exists
+ * - dropDocsChunksCollection() - Drops the docs_chunks collection
  * - upsertDocsChunks() - Bulk upsert documents into docs_chunks collection
  */
 
@@ -149,6 +150,61 @@ export async function ensureDocsChunksCollection(): Promise<{ created: boolean }
 }
 
 /**
+ * Drops the docs_chunks collection from Typesense.
+ * 
+ * @returns {Promise<{ dropped: boolean }>} Object indicating whether the collection was dropped
+ * @throws {Error} If there's an authentication or connection error
+ */
+export async function dropDocsChunksCollection(): Promise<{ dropped: boolean }> {
+	const client = getTypesenseClient();
+
+	try {
+		// Try to delete the collection
+		try {
+			await client.collections(DOCS_CHUNKS_COLLECTION).delete();
+			return { dropped: true };
+		} catch (error: any) {
+			// If error is 404, collection doesn't exist
+			if (error?.httpStatus === 404) {
+				return { dropped: false };
+			}
+
+			// For other errors, re-throw with context
+			const errorMessage = error?.message || 'Unknown error';
+			const httpStatus = error?.httpStatus;
+
+			if (httpStatus === 401 || httpStatus === 403) {
+				throw new Error(
+					`Authentication failed while dropping collection: ${errorMessage}. ` +
+					`Please check your TYPESENSE_API_KEY.`
+				);
+			}
+
+			if (error?.message?.includes('ECONNREFUSED') || error?.message?.includes('ENOTFOUND')) {
+				throw new Error(
+					`Connection failed to Typesense server at ${config.typesense.protocol}://${config.typesense.host}:${config.typesense.port}. ` +
+					`Please check that Typesense is running and TYPESENSE_HOST/TYPESENSE_PORT are correct.`
+				);
+			}
+
+			throw new Error(
+				`Failed to drop collection '${DOCS_CHUNKS_COLLECTION}': ${errorMessage}`
+			);
+		}
+	} catch (error) {
+		// Re-throw our custom errors as-is
+		if (error instanceof Error) {
+			throw error;
+		}
+
+		// Wrap unexpected errors
+		throw new Error(
+			`Unexpected error in dropDocsChunksCollection: ${String(error)}`
+		);
+	}
+}
+
+/**
  * Bulk upsert documents into the docs_chunks collection.
  * 
  * Uses Typesense's import API with action=upsert to efficiently
@@ -176,8 +232,19 @@ export async function upsertDocsChunks(
 			.import(docs, { action: 'upsert' });
 
 		// Parse the import results
-		// Typesense import API returns newline-delimited JSON (NDJSON)
-		const rawResponseLines = importResults.split('\n').filter((line: string) => line.trim() !== '');
+		// Typesense import API returns newline-delimited JSON (NDJSON) as a string
+		// Handle both string and array responses
+		let rawResponseLines: string[] = [];
+		
+		if (typeof importResults === 'string') {
+			rawResponseLines = importResults.split('\n').filter((line: string) => line.trim() !== '');
+		} else if (Array.isArray(importResults)) {
+			// If it's already an array, convert each item to a JSON string
+			rawResponseLines = importResults.map((item: any) => JSON.stringify(item));
+		} else {
+			// If it's an object or something else, try to stringify it
+			rawResponseLines = [JSON.stringify(importResults)];
+		}
 		
 		let success = 0;
 		let failed = 0;

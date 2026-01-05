@@ -69,7 +69,7 @@ export const docsChunksSchema = {
 			// Faceted to enable multi-select tag filtering
 			facet: true,
 			optional: true,
-			index: false,
+			index: true,
 		},
 		{
 			name: 'embedding',

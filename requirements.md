@@ -3,7 +3,7 @@
 ## Purpose
 Build a production-style AI-powered documentation search system demonstrating:
 - Hybrid search (keyword + vector)
-- Two-stage retrieval (retrieve → rerank)
+- Two-stage retrieval (retrieve → fuse → rerank)
 - Real-world ingestion pipeline
 - Modern SvelteKit UI
 - Clear, explainable relevance signals
@@ -56,11 +56,20 @@ Each result must expose:
 
 ---
 
-## Dataset Requirements
-- Source: Typesense documentation site
-- Acquisition via Firecrawl crawl API
-- Content format: Markdown
-- Each page must be chunked by heading hierarchy
+## Dataset Requirements (UPDATED)
+### Source
+- Use the official Typesense documentation content from the Typesense website repo (checked out locally).
+
+### Acquisition
+- No Firecrawl in v1.
+- The ingestion pipeline must read docs from the local repo filesystem.
+
+### Content Format
+- Prefer Markdown files as the primary source.
+- Derive:
+  - `url` (constructed from docs path + base URL)
+  - `title` (from frontmatter or first heading)
+  - `markdown` (raw markdown content)
 
 ---
 
@@ -130,4 +139,3 @@ Each result must expose:
 - Hybrid search outperforms keyword-only for vague queries
 - Reranking visibly improves top results
 - Demo can be explained in <3 minutes
-

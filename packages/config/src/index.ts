@@ -1,4 +1,14 @@
 import { z } from 'zod';
+import { config as dotenvConfig } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env file from project root
+// This file is in packages/config/src, so we need to go up 3 levels to reach the root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = resolve(__dirname, '../../../');
+dotenvConfig({ path: resolve(projectRoot, '.env') });
 
 /**
  * Environment variable schema validation
@@ -21,9 +31,9 @@ const envSchema = z.object({
 	COHERE_API_KEY: z.string().min(1, 'COHERE_API_KEY is required'),
 	COHERE_RERANK_MODEL: z.string().min(1, 'COHERE_RERANK_MODEL is required'),
 
-	// Firecrawl configuration
-	FIRECRAWL_API_KEY: z.string().min(1, 'FIRECRAWL_API_KEY is required'),
-	DOCS_SEED_URL: z.string().url('DOCS_SEED_URL must be a valid URL'),
+	// Local docs repository configuration
+	DOCS_REPO_PATH: z.string().min(1, 'DOCS_REPO_PATH is required'),
+	DOCS_BASE_URL: z.string().url('DOCS_BASE_URL must be a valid URL'),
 	DOCS_SOURCE_ID: z.string().min(1, 'DOCS_SOURCE_ID is required')
 });
 
@@ -46,10 +56,10 @@ export type Config = {
 		cohereApiKey: string;
 		cohereRerankModel: string;
 	};
-	firecrawl: {
-		apiKey: string;
-		docsSeedUrl: string;
-		docsSourceId: string;
+	docs: {
+		repoPath: string;
+		baseUrl: string;
+		sourceId: string;
 	};
 };
 
@@ -77,10 +87,10 @@ function loadConfig(): Config {
 				cohereApiKey: env.COHERE_API_KEY,
 				cohereRerankModel: env.COHERE_RERANK_MODEL
 			},
-			firecrawl: {
-				apiKey: env.FIRECRAWL_API_KEY,
-				docsSeedUrl: env.DOCS_SEED_URL,
-				docsSourceId: env.DOCS_SOURCE_ID
+			docs: {
+				repoPath: env.DOCS_REPO_PATH,
+				baseUrl: env.DOCS_BASE_URL,
+				sourceId: env.DOCS_SOURCE_ID
 			}
 		};
 	} catch (error) {
