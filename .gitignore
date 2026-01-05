@@ -25,6 +25,9 @@ build/
 .vercel/
 .netlify/
 
+# Ingest outputs
+ingest/out/
+
 # TypeScript
 *.tsbuildinfo
 .tsbuildinfo
