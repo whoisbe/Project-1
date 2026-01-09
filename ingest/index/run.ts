@@ -1,17 +1,19 @@
 /**
  * Runner script for indexing embedded chunks into Typesense
  * 
- * Usage: npx tsx index/run.ts [--batch-size=100] [--input-file=path/to/chunks_embedded.jsonl]
+ * Usage: npx tsx index/run.ts [--batch-size=100] [--input-file=path/to/chunks_embedded.jsonl] [--debug]
  */
 
 import { indexChunks } from './typesense.js';
+import { dropDocsChunksCollection, ensureDocsChunksCollection } from '../typesense/client.js';
 
 const DEFAULT_BATCH_SIZE = 100;
 
-function parseArgs(): { batchSize: number; inputFile?: string } {
+function parseArgs(): { batchSize: number; inputFile?: string; debug: boolean } {
 	const args = process.argv.slice(2);
 	let batchSize = DEFAULT_BATCH_SIZE;
 	let inputFile: string | undefined;
+	let debug = false;
 
 	for (const arg of args) {
 		if (arg.startsWith('--batch-size=')) {
@@ -23,6 +25,8 @@ function parseArgs(): { batchSize: number; inputFile?: string } {
 			}
 		} else if (arg.startsWith('--input-file=')) {
 			inputFile = arg.split('=')[1];
+		} else if (arg === '--debug') {
+			debug = true;
 		} else if (arg === '--help' || arg === '-h') {
 			console.log(`
 Usage: npx tsx index/run.ts [options]
@@ -30,21 +34,22 @@ Usage: npx tsx index/run.ts [options]
 Options:
   --batch-size=N     Number of documents per batch (default: ${DEFAULT_BATCH_SIZE})
   --input-file=PATH  Path to chunks_embedded.jsonl (default: ingest/out/chunks_embedded.jsonl)
+  --debug            Enable debug mode (logs first document payload)
   --help, -h         Show this help message
 
 Example:
-  npx tsx index/run.ts --batch-size=50
+  npx tsx index/run.ts --batch-size=50 --debug
 			`);
 			process.exit(0);
 		}
 	}
 
-	return { batchSize, inputFile };
+	return { batchSize, inputFile, debug };
 }
 
 async function main() {
 	try {
-		const { batchSize, inputFile } = parseArgs();
+		const { batchSize, inputFile, debug } = parseArgs();
 
 		console.log('='.repeat(60));
 		console.log('Typesense Indexing');
@@ -53,10 +58,28 @@ async function main() {
 		if (inputFile) {
 			console.log(`Input file: ${inputFile}`);
 		}
+		if (debug) {
+			console.log(`Debug mode: enabled`);
+		}
+		console.log('');
+
+		// Drop and recreate collection before indexing (schema changes require recreation)
+		console.log('Dropping existing collection...');
+		const { dropped } = await dropDocsChunksCollection();
+		console.log(dropped ? 'Collection dropped.' : 'Collection did not exist.');
+		console.log('');
+
+		console.log('Creating collection with updated schema...');
+		const { created } = await ensureDocsChunksCollection();
+		if (created) {
+			console.log('Collection created successfully.');
+		} else {
+			console.log('Collection already exists (this should not happen after dropping).');
+		}
 		console.log('');
 
 		const startTime = Date.now();
-		const stats = await indexChunks({ batchSize, inputFile });
+		const stats = await indexChunks({ batchSize, inputFile, debug });
 		const duration = (Date.now() - startTime) / 1000;
 
 		console.log('');

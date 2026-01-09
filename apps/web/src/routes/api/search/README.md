@@ -12,6 +12,7 @@
 | `limit` | number | No | `10` | Maximum number of results (max: 50) |
 | `section_path` | string | No | - | Filter results by section path |
 | `source` | string | No | - | Filter results by source |
+| `version` | string | No | `latest` | Filter by docs version: `latest` (default), `all`, or version string (e.g., `30.0`, `0.25.1`) |
 | `rerank` | boolean | No | `true` | Enable reranking (only applies to hybrid mode) |
 
 ## Response Format
@@ -23,7 +24,8 @@
   "limit": 10,
   "filters": {
     "section_path": "string (optional)",
-    "source": "string (optional)"
+    "source": "string (optional)",
+    "docs_version": "number | null (optional, present when version filter is applied)"
   },
   "timings_ms": {
     "keyword": 123,
@@ -79,6 +81,26 @@ curl "http://localhost:5173/api/search?q=authentication&mode=hybrid&limit=10&rer
 ### Hybrid Search with Custom Limit
 ```bash
 curl "http://localhost:5173/api/search?q=authentication&mode=hybrid&limit=25"
+```
+
+### Search with Version Filtering
+
+#### Latest Version (Default)
+```bash
+curl "http://localhost:5173/api/search?q=vector%20search"
+# or explicitly
+curl "http://localhost:5173/api/search?q=vector%20search&version=latest"
+```
+
+#### All Versions
+```bash
+curl "http://localhost:5173/api/search?q=vector%20search&version=all"
+```
+
+#### Specific Version
+```bash
+curl "http://localhost:5173/api/search?q=vector%20search&version=30.0"
+curl "http://localhost:5173/api/search?q=vector%20search&version=0.25.1"
 ```
 
 ## Error Responses

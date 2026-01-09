@@ -1,0 +1,4 @@
+typesense
+prompt-toolkit
+rich
+python-dotenv

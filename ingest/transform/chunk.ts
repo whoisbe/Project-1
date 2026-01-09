@@ -18,6 +18,7 @@ export type ChunkRecord = {
 	content: string; // chunk text
 	source: string;
 	tags?: string[];
+	docs_version: number; // numeric version score parsed from URL, or 0 if unversioned
 };
 
 /**
@@ -280,6 +281,46 @@ function splitSectionIntoChunks(
 }
 
 /**
+ * Parse version from URL and convert to numeric score
+ * 
+ * URL format: https://typesense.org/docs/<version>/...
+ * Examples:
+ * - https://typesense.org/docs/30.0/... -> 30_000_000
+ * - https://typesense.org/docs/0.25.1/... -> 25_001
+ * - https://typesense.org/docs/... -> 0 (unversioned)
+ * 
+ * Conversion: major*1_000_000 + minor*1_000 + patch
+ * Note: Returns 0 for unversioned URLs to avoid null filtering issues in Typesense
+ */
+function parseDocsVersion(url: string): number {
+	// Match URL pattern: https://typesense.org/docs/<version>/ or https://typesense.org/docs/<version>/...
+	// Handles both directory URLs (ending with /) and file URLs (with path after version)
+	const versionMatch = url.match(/^https:\/\/typesense\.org\/docs\/([^\/]+)(?:\/|$)/);
+	if (!versionMatch) {
+		// Unversioned URL (no version segment) - return 0
+		return 0;
+	}
+
+	const versionStr = versionMatch[1];
+	
+	// Parse semantic version: major.minor.patch (patch optional)
+	const parts = versionStr.split('.').map(part => parseInt(part, 10));
+	
+	// Validate all parts are valid numbers
+	if (parts.some(part => isNaN(part))) {
+		// Invalid version format - treat as unversioned
+		return 0;
+	}
+
+	const major = parts[0] || 0;
+	const minor = parts[1] || 0;
+	const patch = parts[2] || 0;
+
+	// Convert to numeric score: major*1_000_000 + minor*1_000 + patch
+	return major * 1_000_000 + minor * 1_000 + patch;
+}
+
+/**
  * Generate stable hash for chunk ID
  */
 function generateChunkId(url: string, sectionPath: string, chunkIndex: number): string {
@@ -326,6 +367,7 @@ export function chunkPage(page: PageRecord): ChunkRecord[] {
 			}
 			
 			const chunkId = generateChunkId(page.url, sectionPath, i);
+			const docsVersion = parseDocsVersion(page.url);
 			
 			chunks.push({
 				id: chunkId,
@@ -333,7 +375,8 @@ export function chunkPage(page: PageRecord): ChunkRecord[] {
 				title: processedTitle,
 				section_path: sectionPath,
 				content: fullChunkContent,
-				source: page.source
+				source: page.source,
+				docs_version: docsVersion
 			});
 		}
 	}

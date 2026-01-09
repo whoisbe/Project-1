@@ -25,6 +25,7 @@ export type VectorSearchResult = {
 	snippet: string;
 	vector_rank: number;
 	vector_score?: number;
+	docs_version?: number; // numeric version score, or 0 for unversioned
 };
 
 /**
@@ -33,6 +34,8 @@ export type VectorSearchResult = {
 export type VectorSearchFilters = {
 	section_path?: string;
 	source?: string;
+	docs_version?: number; // numeric version score, or 0 for unversioned
+	_filterBy?: string; // Internal: pre-built filter_by clause for OR handling
 };
 
 /**
@@ -145,25 +148,37 @@ export async function vectorSearch(
 	// Generate query embedding
 	const queryEmbedding = await generateQueryEmbedding(query);
 
-	// Build filter_by clause
-	const filterParts: string[] = [];
-	if (filters.section_path) {
-		filterParts.push(`section_path:=${filters.section_path}`);
+	// Use pre-built filter_by if provided (for OR clause handling)
+	// Otherwise, build filter_by from individual filters (legacy behavior)
+	let filterBy: string | undefined;
+	
+	if (filters._filterBy !== undefined) {
+		filterBy = filters._filterBy;
+	} else {
+		// Build filter_by clause from individual filters
+		const filterParts: string[] = [];
+		if (filters.section_path) {
+			filterParts.push(`section_path:=${filters.section_path}`);
+		}
+		if (filters.source) {
+			filterParts.push(`source:=${filters.source}`);
+		}
+		if (filters.docs_version !== undefined && filters.docs_version !== null) {
+			// Filter for specific version (0 means unversioned)
+			filterParts.push(`docs_version:=${filters.docs_version}`);
+		}
+		filterBy = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 	}
-	if (filters.source) {
-		filterParts.push(`source:=${filters.source}`);
-	}
-	const filterBy = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
-
-	// Build vector_query string: embedding:([...values], k:limit)
-	// Format the embedding array as a comma-separated string
-	const embeddingStr = queryEmbedding.join(',');
-	const vectorQuery = `embedding:([${embeddingStr}], k:${limit})`;
 
 	const client = getTypesenseClient();
 
-	// Perform vector search
-	const searchParams: any = {
+	// Perform vector search using multi_search endpoint to avoid query string length limits
+	// multi_search uses POST and can handle large vector queries
+	// Build vector_query string: embedding:([...values], k:limit)
+	const embeddingStr = queryEmbedding.join(',');
+	const vectorQuery = `embedding:([${embeddingStr}], k:${limit})`;
+
+	const searchParams = {
 		q: '*', // Required parameter but not used for vector-only search
 		vector_query: vectorQuery,
 		filter_by: filterBy,
@@ -171,10 +186,33 @@ export async function vectorSearch(
 	};
 
 	try {
-		const searchResults = await client
-			.collections(DOCS_CHUNKS_COLLECTION)
-			.documents()
-			.search(searchParams);
+		// Use multi_search which uses POST and can handle large payloads
+		// Format: { searches: [{ collection: 'name', ...params }] }
+		const multiSearchParams = {
+			searches: [
+				{
+					collection: DOCS_CHUNKS_COLLECTION,
+					...searchParams
+				}
+			]
+		};
+
+		const multiSearchResults = await client.multiSearch.perform(multiSearchParams, {});
+		
+		// Extract results from multi_search response
+		// multi_search returns { results: [{ hits: [...], ... }] or [{ error: '...' }] }
+		if (!multiSearchResults.results || multiSearchResults.results.length === 0) {
+			return [];
+		}
+		
+		const firstResult = multiSearchResults.results[0];
+		
+		// Check if the result contains an error
+		if ((firstResult as any).error) {
+			throw new Error(`Vector search error: ${(firstResult as any).error}`);
+		}
+		
+		const searchResults = firstResult;
 
 		// Map Typesense results to our output shape
 		const results: VectorSearchResult[] = (searchResults.hits || []).map((hit, index) => {
@@ -203,7 +241,8 @@ export async function vectorSearch(
 				section_path: doc.section_path || '',
 				snippet: snippet || '',
 				vector_rank: index + 1, // 1-based rank
-				vector_score: vectorScore
+				vector_score: vectorScore,
+				docs_version: doc.docs_version !== undefined ? doc.docs_version : 0
 			};
 		});
 

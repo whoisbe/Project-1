@@ -23,6 +23,7 @@ export type KeywordSearchResult = {
 	section_path: string;
 	snippet: string;
 	keyword_rank: number;
+	docs_version?: number; // numeric version score, or 0 for unversioned
 };
 
 /**
@@ -31,6 +32,8 @@ export type KeywordSearchResult = {
 export type KeywordSearchFilters = {
 	section_path?: string;
 	source?: string;
+	docs_version?: number; // numeric version score, or 0 for unversioned
+	_filterBy?: string; // Internal: pre-built filter_by clause for OR handling
 };
 
 /**
@@ -80,15 +83,27 @@ export async function keywordSearch(
 ): Promise<KeywordSearchResult[]> {
 	const client = getTypesenseClient();
 
-	// Build filter_by clause
-	const filterParts: string[] = [];
-	if (filters.section_path) {
-		filterParts.push(`section_path:=${filters.section_path}`);
+	// Use pre-built filter_by if provided (for OR clause handling)
+	// Otherwise, build filter_by from individual filters (legacy behavior)
+	let filterBy: string | undefined;
+	
+	if (filters._filterBy !== undefined) {
+		filterBy = filters._filterBy;
+	} else {
+		// Build filter_by clause from individual filters
+		const filterParts: string[] = [];
+		if (filters.section_path) {
+			filterParts.push(`section_path:=${filters.section_path}`);
+		}
+		if (filters.source) {
+			filterParts.push(`source:=${filters.source}`);
+		}
+		if (filters.docs_version !== undefined && filters.docs_version !== null) {
+			// Filter for specific version (0 means unversioned)
+			filterParts.push(`docs_version:=${filters.docs_version}`);
+		}
+		filterBy = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 	}
-	if (filters.source) {
-		filterParts.push(`source:=${filters.source}`);
-	}
-	const filterBy = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
 
 	// Perform search
 	const searchParams = {
@@ -161,7 +176,8 @@ export async function keywordSearch(
 				url: doc.url || '',
 				section_path: doc.section_path || '',
 				snippet: snippet || '',
-				keyword_rank: index + 1 // 1-based rank
+				keyword_rank: index + 1, // 1-based rank
+				docs_version: doc.docs_version !== undefined ? doc.docs_version : 0
 			};
 		});
 

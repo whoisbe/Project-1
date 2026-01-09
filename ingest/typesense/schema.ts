@@ -72,11 +72,22 @@ export const docsChunksSchema = {
 			index: true,
 		},
 		{
+			name: 'docs_version',
+			type: 'int32',
+			// Numeric version score parsed from URL (major*1_000_000 + minor*1_000 + patch)
+			// 0 for unversioned URLs (set to 0 instead of null to avoid Typesense OR filtering issues)
+			// Faceted to enable filtering by documentation version
+			facet: true,
+			index: true,
+			optional: true,
+		},
+		{
 			name: 'embedding',
 			type: 'float[]',
+			num_dim: 1536, // OpenAI text-embedding-3-small produces 1536-dimensional vectors
+			vector_query: true, // Enable vector search queries on this field
 			// Vector embedding from OpenAI text-embedding-3-small (1536 dimensions)
 			// Pre-computed embeddings stored for semantic/vector search
-			// Dimensions: 1536 (OpenAI text-embedding-3-small standard output)
 			// Typesense will use these pre-computed vectors for similarity search
 		},
 	],

@@ -119,6 +119,10 @@ function pathToSlug(docsRoot: string, filePath: string, baseUrl: string): string
 		if (slug === '.' || slug === '') {
 			slug = '';
 		}
+		// For index/README files, ensure trailing slash
+		if (slug !== '') {
+			slug = slug + '/';
+		}
 	}
 	
 	// Ensure slug doesn't start with / (we'll add it to base URL)
@@ -129,10 +133,11 @@ function pathToSlug(docsRoot: string, filePath: string, baseUrl: string): string
 	
 	// Construct final URL
 	if (slug === '') {
-		return cleanBaseUrl;
+		return cleanBaseUrl + '/';
 	}
 	
 	// Ensure exactly one slash between base and slug
+	// NO .html suffix - URLs are canonical paths
 	return `${cleanBaseUrl}/${slug}`;
 }
 

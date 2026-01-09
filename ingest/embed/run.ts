@@ -43,6 +43,7 @@ interface ChunkRecord {
 	content: string;
 	source: string;
 	tags?: string[];
+	docs_version?: number; // numeric version score, or 0 if unversioned
 }
 
 interface EmbeddedChunkRecord extends ChunkRecord {

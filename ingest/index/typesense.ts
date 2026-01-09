@@ -27,6 +27,7 @@ export interface IndexingStats {
 export interface IndexingOptions {
 	batchSize?: number;
 	inputFile?: string;
+	debug?: boolean;
 }
 
 /**
@@ -78,6 +79,26 @@ function validateChunk(doc: any): { isValid: boolean; error?: string } {
 		}
 	}
 
+	// Validate and normalize docs_version (must be a number/int32, default to 0 if missing)
+	if (doc.docs_version === undefined || doc.docs_version === null) {
+		// Normalize missing/null to 0 (unversioned)
+		doc.docs_version = 0;
+	} else {
+		if (typeof doc.docs_version !== 'number' || !Number.isInteger(doc.docs_version)) {
+			return {
+				isValid: false,
+				error: `docs_version must be an integer (int32), got ${typeof doc.docs_version}: ${doc.docs_version}`
+			};
+		}
+		// Ensure it's within int32 range (-2,147,483,648 to 2,147,483,647)
+		if (doc.docs_version < -2147483648 || doc.docs_version > 2147483647) {
+			return {
+				isValid: false,
+				error: `docs_version out of int32 range: ${doc.docs_version}`
+			};
+		}
+	}
+
 	return { isValid: true };
 }
 
@@ -92,7 +113,8 @@ export async function indexChunks(
 ): Promise<IndexingStats> {
 	const {
 		batchSize = 100,
-		inputFile = resolve(__dirname, '../out/chunks_embedded.jsonl')
+		inputFile = resolve(__dirname, '../out/chunks_embedded.jsonl'),
+		debug = false
 	} = options;
 
 	const stats: IndexingStats = {
@@ -117,9 +139,13 @@ export async function indexChunks(
 
 	let batch: Array<Record<string, any>> = [];
 	let lineNumber = 0;
+	let firstDocLogged = false;
 
 	console.log(`Starting indexing from ${inputFile}...`);
 	console.log(`Batch size: ${batchSize}`);
+	if (debug) {
+		console.log('Debug mode: enabled');
+	}
 
 	for await (const line of rl) {
 		lineNumber++;
@@ -157,6 +183,19 @@ export async function indexChunks(
 				});
 			}
 			continue;
+		}
+
+		// Debug: Log first document payload (excluding embedding)
+		if (debug && !firstDocLogged) {
+			const { embedding, ...docWithoutEmbedding } = doc;
+			console.log('');
+			console.log('='.repeat(60));
+			console.log('DEBUG: First document payload (embedding excluded):');
+			console.log('='.repeat(60));
+			console.log(JSON.stringify(docWithoutEmbedding, null, 2));
+			console.log('='.repeat(60));
+			console.log('');
+			firstDocLogged = true;
 		}
 
 		// Add to batch
