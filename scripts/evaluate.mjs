@@ -5,8 +5,16 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
-const LOG_FILE = path.join(ROOT_DIR, 'apps/web/logs/search.jsonl');
-const GROUND_TRUTH_FILE = path.join(ROOT_DIR, 'eval/ground_truth.json');
+
+// Parse CLI args
+const args = process.argv.slice(2);
+const getArg = (name, def) => {
+    const idx = args.indexOf(`--${name}`);
+    return idx >= 0 && args[idx + 1] ? args[idx + 1] : def;
+};
+
+const LOG_FILE = path.resolve(ROOT_DIR, getArg('logFile', 'apps/web/logs/search.jsonl'));
+const GROUND_TRUTH_FILE = path.resolve(ROOT_DIR, getArg('groundTruth', 'eval/ground_truth.json'));
 
 // --- Metrics Calculation ---
 
@@ -99,8 +107,10 @@ async function main() {
                 stats[mode] = { recallSum: 0, ndcgSum: 0, count: 0 };
             }
 
-            const recall = calculateRecall(entry.results, relevantIds, 5);
-            const ndcg = calculateNDCG(entry.results, relevantIds, 5);
+            const resultIds = entry.result_ids || (entry.results ? entry.results.map(r => typeof r === 'string' ? r : r.id) : []);
+
+            const recall = calculateRecall(resultIds, relevantIds, 5);
+            const ndcg = calculateNDCG(resultIds, relevantIds, 5);
 
             stats[mode].recallSum += recall;
             stats[mode].ndcgSum += ndcg;

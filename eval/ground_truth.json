@@ -1,12 +1,59 @@
 {
-  "logging test": [
-    "4c8fc72cc9d5edb7",
-    "7a86b910d8683f21",
-    "ef9bfa1b4c06c852",
-    "e1e3739b1ae3d3a1"
+  "what is typesense": [
+    "32dd86d43893f39a",
+    "e7182f30d7b0ff9f",
+    "8cb3cbef655c0108",
+    "007fcf21fce2e909"
   ],
-  "typesense": [
-    "e697eebe91ccafe6",
-    "ef9bfa1b4c06c852"
-  ]
+  "when should i use typesense": [
+    "32dd86d43893f39a",
+    "9aee122fc61d4298",
+    "8cb3cbef655c0108"
+  ],
+  "typesense use cases": [
+    "9aee122fc61d4298",
+    "0a3e9e5a2a149840",
+    "007fcf21fce2e909",
+    "35418adde27f0bd5"
+  ],
+  "how typesense differs from elasticsearch": [
+    "90affd8baddef7ee",
+    "8cb3cbef655c0108"
+  ],
+  "is typesense good for ecommerce search": [
+    "9aee122fc61d4298",
+    "c7255b8e9263104d",
+    "556a591175a316ab"
+  ],
+  "vector search in typesense": [
+    "9f5c8ec494fc4a18",
+    "ad644454d8d384f9",
+    "a0efa22f1b816ab4"
+  ],
+  "hybrid search keyword and vector": [
+    "54180409dbaaa5c5",
+    "34a8c4146c268ba2",
+    "9f5c8ec494fc4a18"
+  ],
+  "faceted search": [
+    "6a2837fb43974fca",
+    "f6b21e182dd88a4e"
+  ],
+  "typo tolerance": [],
+  "ranking and relevance": [],
+  "search parameters": [],
+  "query_by parameter": [],
+  "filter_by syntax": [],
+  "sort_by field": [],
+  "per_page limit": [],
+  "replication and high availability": [],
+  "clustering typesense": [],
+  "how to scale typesense": [],
+  "memory requirements": [],
+  "deployment options": [],
+  "synonyms support": [],
+  "handling misspellings": [],
+  "prefix search vs exact match": [],
+  "vector distance metrics": [],
+  "embedding field configuration": []
 }
