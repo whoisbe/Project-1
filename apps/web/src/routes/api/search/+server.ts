@@ -26,6 +26,8 @@ import type { RerankCandidate } from '$lib/search/rerank/types.js';
 import { diversifyByUrl } from '$lib/search/diversify.js';
 import Typesense from 'typesense';
 import { config } from '@repo/config';
+import { logSearchQuery } from '$lib/server/logger.js';
+import { routeQuery, type AgentDecision } from '$lib/search/agent.js';
 
 /**
  * Response type for search API
@@ -44,6 +46,7 @@ type SearchResponse = {
 		score?: number;
 	} | null;
 	applied_filter_by?: string | null;
+	agent_decision?: AgentDecision | null;
 	timings_ms: {
 		keyword?: number;
 		vector?: number;
@@ -111,7 +114,7 @@ function getTypesenseClient(): Typesense.Client {
  */
 function parseVersionString(versionStr: string): number | null {
 	const parts = versionStr.split('.').map(part => parseInt(part, 10));
-	
+
 	// Validate all parts are valid numbers
 	if (parts.some(part => isNaN(part))) {
 		return null;
@@ -137,7 +140,7 @@ async function getLatestVersion(): Promise<number | null> {
 
 	try {
 		const client = getTypesenseClient();
-		
+
 		// Query Typesense to get the maximum docs_version value
 		// Use a facet query to get distinct docs_version values
 		const searchParams = {
@@ -156,7 +159,7 @@ async function getLatestVersion(): Promise<number | null> {
 		// Extract facet values for docs_version
 		const facets = (result as any).facet_counts || [];
 		const docsVersionFacet = facets.find((f: any) => f.field_name === 'docs_version');
-		
+
 		if (!docsVersionFacet || !docsVersionFacet.counts || docsVersionFacet.counts.length === 0) {
 			// No versioned docs found
 			cachedLatestVersion = null;
@@ -195,6 +198,7 @@ function parseQueryParams(url: URL): {
 	filters: { section_path?: string; source?: string; docs_version?: number | null };
 	rerank: boolean;
 	versionParam: string;
+	useAgent: boolean;
 } {
 	const q = url.searchParams.get('q')?.trim() || '';
 	if (!q) {
@@ -225,7 +229,7 @@ function parseQueryParams(url: URL): {
 	// Parse version parameter: "latest" | "all" | "<number>" (e.g., "30.0" or "0.25.1")
 	const versionParam = url.searchParams.get('version')?.trim() || 'latest';
 	let docs_version: number | null | undefined = undefined;
-	
+
 	if (versionParam.toLowerCase() === 'all') {
 		// No version filter
 		docs_version = undefined;
@@ -258,6 +262,10 @@ function parseQueryParams(url: URL): {
 		}
 	}
 
+	// Agent flag
+	const agentParam = url.searchParams.get('agent');
+	const useAgent = agentParam === 'true';
+
 	return {
 		q,
 		mode,
@@ -268,7 +276,8 @@ function parseQueryParams(url: URL): {
 			docs_version: versionParam.toLowerCase() === 'latest' ? undefined : docs_version
 		},
 		rerank,
-		versionParam // Pass through to handler for latest resolution
+		versionParam, // Pass through to handler for latest resolution
+		useAgent
 	};
 }
 
@@ -290,13 +299,22 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	try {
 		// Parse and validate query parameters
-		const { q, mode, limit, filters, rerank, versionParam } = parseQueryParams(url);
-		
+		let { q, mode, limit, filters, rerank, versionParam, useAgent } = parseQueryParams(url);
+
+		let agentDecision: AgentDecision | null = null;
+
+		// Agent Routing Logic
+		if (useAgent) {
+			agentDecision = routeQuery(q);
+			mode = agentDecision.mode;
+			rerank = agentDecision.rerank;
+		}
+
 		// Resolve version and build filter clause
 		let resolvedFilters = { ...filters };
 		let versionFilterClause: string | undefined = undefined;
 		let resolvedVersion: SearchResponse['resolved_version'] = null;
-		
+
 		if (versionParam.toLowerCase() === 'latest') {
 			const latestVersion = await getLatestVersion();
 			if (latestVersion !== null && latestVersion > 0) {
@@ -476,12 +494,12 @@ export const GET: RequestHandler = async ({ url }) => {
 					} catch (rerankError: any) {
 						// Log rerank error but don't fail the request
 						console.error('Reranking failed, falling back to non-reranked results:', rerankError);
-						
+
 						// Add warning about rerank failure
 						const errorMessage = rerankError?.message || 'Unknown error';
 						const status = rerankError?.status || rerankError?.httpStatus;
 						warnings.push(`rerank_failed: ${status ? `HTTP ${status}` : errorMessage}`);
-						
+
 						// Results already contain fused results without rerank_score, so we can just continue
 					}
 				} else {
@@ -501,6 +519,12 @@ export const GET: RequestHandler = async ({ url }) => {
 		const endTime = performance.now();
 		timings.total = Math.round(endTime - startTime);
 
+		// Log the search query (fire-and-forget, non-blocking)
+		// We don't await this to ensure it doesn't affect response latency
+		logSearchQuery(q, mode, results.map(r => r.id)).catch(err => {
+			console.error('Logging failed:', err);
+		});
+
 		// Return response
 		const response: SearchResponse = {
 			query: q,
@@ -509,6 +533,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			filters: resolvedFilters,
 			resolved_version: resolvedVersion,
 			applied_filter_by: completeFilterBy || null,
+			agent_decision: agentDecision,
 			timings_ms: timings,
 			rerank_applied: rerankApplied,
 			warnings,

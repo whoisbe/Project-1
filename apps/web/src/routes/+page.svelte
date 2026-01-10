@@ -1,18 +1,20 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import type { SearchResponse } from '../api/search/+server';
-	import { normalizeDocUrl } from '$lib/url/normalizeDocUrl.js';
+	import { onMount } from "svelte";
+	import { page } from "$app/stores";
+	import { goto } from "$app/navigation";
+	import type { SearchResponse } from "../api/search/+server";
+	import { normalizeDocUrl } from "$lib/url/normalizeDocUrl.js";
 
 	// Initialize state from URL params
 	function getInitialState() {
 		const urlParams = $page.url.searchParams;
 		return {
-			q: urlParams.get('q') || '',
-			mode: (urlParams.get('mode') as 'keyword' | 'semantic' | 'hybrid') || 'hybrid',
-			limit: parseInt(urlParams.get('limit') || '10', 10),
-			rerank: urlParams.get('rerank') !== 'false'
+			q: urlParams.get("q") || "",
+			mode:
+				(urlParams.get("mode") as "keyword" | "semantic" | "hybrid") ||
+				"hybrid",
+			limit: parseInt(urlParams.get("limit") || "10", 10),
+			rerank: urlParams.get("rerank") !== "false",
 		};
 	}
 
@@ -24,10 +26,10 @@
 	// Update URL when state changes (but don't trigger search)
 	function updateURL() {
 		const params = new URLSearchParams();
-		if (state.q) params.set('q', state.q);
-		if (state.mode !== 'hybrid') params.set('mode', state.mode);
-		if (state.limit !== 10) params.set('limit', state.limit.toString());
-		if (!state.rerank) params.set('rerank', 'false');
+		if (state.q) params.set("q", state.q);
+		if (state.mode !== "hybrid") params.set("mode", state.mode);
+		if (state.limit !== 10) params.set("limit", state.limit.toString());
+		if (!state.rerank) params.set("rerank", "false");
 
 		goto(`?${params.toString()}`, { replaceState: true, noScroll: true });
 	}
@@ -35,7 +37,7 @@
 	// Perform search
 	async function performSearch() {
 		if (!state.q.trim()) {
-			error = 'Please enter a search query';
+			error = "Please enter a search query";
 			return;
 		}
 
@@ -54,14 +56,14 @@
 				q: state.q,
 				mode: state.mode,
 				limit: state.limit.toString(),
-				rerank: state.rerank.toString()
+				rerank: state.rerank.toString(),
 			});
 
 			const url = `/api/search?${params.toString()}`;
-			console.log('Searching:', url);
+			console.log("Searching:", url);
 
 			const response = await fetch(url, {
-				signal: controller.signal
+				signal: controller.signal,
 			});
 
 			clearTimeout(timeoutId);
@@ -82,20 +84,24 @@
 			searchResponse = data;
 		} catch (err) {
 			clearTimeout(timeoutId);
-			
+
 			if (err instanceof Error) {
-				if (err.name === 'AbortError') {
-					error = 'Request timed out. Please try again.';
-				} else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-					error = 'Network error. Please check your connection and try again.';
+				if (err.name === "AbortError") {
+					error = "Request timed out. Please try again.";
+				} else if (
+					err.message.includes("Failed to fetch") ||
+					err.message.includes("NetworkError")
+				) {
+					error =
+						"Network error. Please check your connection and try again.";
 				} else {
 					error = err.message;
 				}
 			} else {
-				error = 'Failed to perform search. Please try again.';
+				error = "Failed to perform search. Please try again.";
 			}
-			
-			console.error('Search error:', err);
+
+			console.error("Search error:", err);
 		} finally {
 			loading = false;
 		}
@@ -109,7 +115,7 @@
 
 	// Initialize search from URL on mount if query exists
 	onMount(() => {
-		const urlQuery = $page.url.searchParams.get('q');
+		const urlQuery = $page.url.searchParams.get("q");
 		if (urlQuery && urlQuery.trim()) {
 			// Only auto-search if there's a valid query in the URL
 			performSearch();
@@ -129,14 +135,41 @@
 				class="query-input"
 				disabled={loading}
 			/>
-			<button type="submit" disabled={loading || !state.q.trim()} class="search-button">
-				{loading ? 'Searching...' : 'Search'}
+			<button
+				type="submit"
+				disabled={loading || !state.q.trim()}
+				class="search-button"
+			>
+				{loading ? "Searching..." : "Search"}
 			</button>
 		</div>
 
 		<div class="search-controls">
 			<div class="control-group">
-				<label for="mode">Mode:</label>
+				<div class="label-with-tooltip">
+					<label for="mode">Mode:</label>
+					<div class="tooltip-container">
+						<span class="help-icon">?</span>
+						<div class="tooltip">
+							<strong>Search Modes:</strong>
+							<ul>
+								<li>
+									<strong>Keyword:</strong> Matches exact words
+									in the document.
+								</li>
+								<li>
+									<strong>Semantic:</strong> Matches the meaning
+									and intent of your query.
+								</li>
+								<li>
+									<strong>Hybrid:</strong> Combines keyword and
+									vector search using Reciprocal Rank Fusion (RRF)
+									and Reranking.
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
 				<select id="mode" bind:value={state.mode} disabled={loading}>
 					<option value="keyword">Keyword</option>
 					<option value="semantic">Semantic</option>
@@ -156,7 +189,11 @@
 
 			<div class="control-group">
 				<label>
-					<input type="checkbox" bind:checked={state.rerank} disabled={loading} />
+					<input
+						type="checkbox"
+						bind:checked={state.rerank}
+						disabled={loading}
+					/>
 					Rerank
 				</label>
 			</div>
@@ -165,7 +202,8 @@
 
 	{#if error}
 		<div class="error-message">
-			<strong>Error:</strong> {error}
+			<strong>Error:</strong>
+			{error}
 		</div>
 	{/if}
 
@@ -173,8 +211,13 @@
 		<div class="results-section">
 			<div class="results-header">
 				<h3>
-					Found {searchResponse.results.length} result{searchResponse.results.length !== 1 ? 's' : ''}
-					{searchResponse.timings_ms.total ? ` (${searchResponse.timings_ms.total}ms)` : ''}
+					Found {searchResponse.results.length} result{searchResponse
+						.results.length !== 1
+						? "s"
+						: ""}
+					{searchResponse.timings_ms.total
+						? ` (${searchResponse.timings_ms.total}ms)`
+						: ""}
 				</h3>
 			</div>
 
@@ -183,23 +226,42 @@
 					<div class="result-item">
 						<div class="result-header">
 							<h4>
-								<a href={normalizeDocUrl(result.url)} target="_blank" rel="noopener noreferrer" class="result-title">
+								<a
+									href={normalizeDocUrl(result.url)}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="result-title"
+								>
 									{result.title}
 								</a>
 							</h4>
 							<div class="result-meta-line">
-								<span class="section-path">{result.section_path}</span>
+								<span class="section-path"
+									>{result.section_path}</span
+								>
 								{#if result.keyword_rank !== undefined}
-									<span class="meta-badge">Keyword: {result.keyword_rank}</span>
+									<span class="meta-badge"
+										>Keyword: {result.keyword_rank}</span
+									>
 								{/if}
 								{#if result.vector_rank !== undefined}
-									<span class="meta-badge">Vector: {result.vector_rank}</span>
+									<span class="meta-badge"
+										>Vector: {result.vector_rank}</span
+									>
 								{/if}
 								{#if result.rrf_score !== undefined}
-									<span class="meta-badge">RRF: {result.rrf_score.toFixed(4)}</span>
+									<span class="meta-badge"
+										>RRF: {result.rrf_score.toFixed(
+											4,
+										)}</span
+									>
 								{/if}
 								{#if result.rerank_score !== undefined}
-									<span class="meta-badge">Rerank: {result.rerank_score.toFixed(4)}</span>
+									<span class="meta-badge"
+										>Rerank: {result.rerank_score.toFixed(
+											4,
+										)}</span
+									>
 								{/if}
 							</div>
 						</div>
@@ -213,25 +275,33 @@
 							<div class="why-content">
 								{#if result.keyword_rank !== undefined}
 									<div class="why-item">
-										<strong>Keyword Rank:</strong> {result.keyword_rank}
+										<strong>Keyword Rank:</strong>
+										{result.keyword_rank}
 									</div>
 								{/if}
 								{#if result.vector_rank !== undefined}
 									<div class="why-item">
-										<strong>Vector Rank:</strong> {result.vector_rank}
+										<strong>Vector Rank:</strong>
+										{result.vector_rank}
 										{#if result.vector_score !== undefined}
-											<span class="score">(score: {result.vector_score.toFixed(4)})</span>
+											<span class="score"
+												>(score: {result.vector_score.toFixed(
+													4,
+												)})</span
+											>
 										{/if}
 									</div>
 								{/if}
 								{#if result.rrf_score !== undefined}
 									<div class="why-item">
-										<strong>RRF Score:</strong> {result.rrf_score.toFixed(4)}
+										<strong>RRF Score:</strong>
+										{result.rrf_score.toFixed(4)}
 									</div>
 								{/if}
 								{#if result.rerank_score !== undefined}
 									<div class="why-item">
-										<strong>Rerank Score:</strong> {result.rerank_score.toFixed(4)}
+										<strong>Rerank Score:</strong>
+										{result.rerank_score.toFixed(4)}
 									</div>
 								{/if}
 							</div>
@@ -333,7 +403,7 @@
 		cursor: not-allowed;
 	}
 
-	.control-group input[type='checkbox'] {
+	.control-group input[type="checkbox"] {
 		margin-right: 0.25rem;
 	}
 
@@ -460,5 +530,86 @@
 	.why-item .score {
 		color: #666;
 		margin-left: 0.5rem;
+	}
+
+	.label-with-tooltip {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.tooltip-container {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		cursor: help;
+	}
+
+	.help-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background-color: #ddd;
+		color: #555;
+		font-size: 10px;
+		font-weight: bold;
+	}
+
+	.tooltip {
+		position: absolute;
+		bottom: 100%;
+		left: 50%;
+		transform: translateX(-50%);
+		background-color: #333;
+		color: #fff;
+		padding: 0.75rem;
+		border-radius: 4px;
+		font-size: 0.85rem;
+		width: 250px;
+		visibility: hidden;
+		opacity: 0;
+		transition:
+			opacity 0.2s,
+			visibility 0.2s;
+		z-index: 1000;
+		pointer-events: none;
+		margin-bottom: 0.5rem;
+		text-align: left;
+		line-height: 1.4;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	}
+
+	.tooltip::after {
+		content: "";
+		position: absolute;
+		top: 100%;
+		left: 50%;
+		margin-left: -6px;
+		border-width: 6px;
+		border-style: solid;
+		border-color: #333 transparent transparent transparent;
+	}
+
+	.tooltip strong {
+		color: #fff;
+		display: block;
+		margin-bottom: 0.25rem;
+	}
+
+	.tooltip ul {
+		margin: 0;
+		padding-left: 1rem;
+	}
+
+	.tooltip li {
+		margin-bottom: 0.25rem;
+	}
+
+	.tooltip-container:hover .tooltip {
+		visibility: visible;
+		opacity: 1;
 	}
 </style>
